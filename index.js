@@ -100,7 +100,7 @@ async function run() {
     app.post("/applications", async (req, res) => {
       try {
         const application = req.body;
-        
+
         const existingApplication = await applicationCollection.findOne({
           scholarshipId: application.scholarshipId,
           userEmail: application.userEmail,
@@ -121,6 +121,20 @@ async function run() {
           error: error.message,
         });
       }
+    });
+
+    
+    app.get("/applications", async (req, res) => {
+      const applications = await applicationCollection.find().toArray();
+      res.send(applications);
+    });
+
+    app.get("/applications/user/:email", async (req, res) => {
+      const email = req.params.email;
+      const applications = await applicationCollection
+        .find({ userEmail: email })
+        .toArray();
+      res.send(applications);
     });
 
     app.listen(port, () => {
