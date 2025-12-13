@@ -8,10 +8,32 @@ require("dotenv").config();
 app.use(express.json());
 app.use(cors());
 
-const verifyFirebaseToken = (req,res,next) => {
-  console.log('headers in the middleware', req.headers.authorization) 
+const admin = require("firebase-admin");
 
-  next();
+const serviceAccount = require("./scholar-stream-adminsdk-key.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+
+const verifyFirebaseToken = async (req,res,next) => {
+  console.log('headers in the middleware', req.headers.authorization) 
+  const token = req.headers.authorization;
+
+  if(!token){
+    return res.status(401).send({message: 'Unauthorized Access'})
+  }
+
+  try{
+    const idToken = token.split(' ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    req.decoded_email = decodedToken.email;
+    next();
+  } catch(err){
+    console.log(err);
+    return res.status(401).send({message: 'Unauthorized Access'})
+  }
 }
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
