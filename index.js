@@ -3,6 +3,7 @@ const cors = require("cors");
 const port = process.env.PORT || 5000;
 const app = express();
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 app.use(express.json());
 app.use(cors());
@@ -123,7 +124,6 @@ async function run() {
       }
     });
 
-    
     app.get("/applications", async (req, res) => {
       const applications = await applicationCollection.find().toArray();
       res.send(applications);
@@ -135,6 +135,79 @@ async function run() {
         .find({ userEmail: email })
         .toArray();
       res.send(applications);
+    });
+
+
+    // Payment Endpoints
+    app.post("/create-checkout-session", async (req, res) => {
+      try {
+        const paymentInfo = req.body;
+        const amount = Math.round(parseFloat(paymentInfo.totalAmount) * 100);
+
+        const session = await stripe.checkout.sessions.create({
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                unit_amount: amount,
+                product_data: {
+                  name: paymentInfo.scholarshipName,
+                  description: `Application for ${paymentInfo.universityName}`,
+                },
+              },
+              quantity: 1,
+            },
+          ],
+          customer_email: paymentInfo.userEmail,
+          mode: "payment",
+          metadata: {
+            applicationId: paymentInfo.applicationId,
+            scholarshipId: paymentInfo.scholarshipId,
+            userEmail: paymentInfo.userEmail,
+          },
+          success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-failed`,
+        });
+
+        console.log("Stripe session created:", session.id);
+        res.send({ url: session.url });
+      } catch (error) {
+        console.error("Error creating checkout session:", error);
+        res.status(500).send({
+          message: "Failed to create payment session",
+          error: error.message,
+        });
+      }
+    });
+
+    app.patch("/payment-success", async (req, res) => {
+      try {
+        const session_id = req.query.session_id;
+        const session = await stripe.checkout.sessions.retrieve(session_id);
+        console.log("Payment session:", session);
+
+        if (session.payment_status === "paid") {
+          const applicationId = session.metadata.applicationId;
+
+          await applicationCollection.updateOne(
+            { _id: new ObjectId(applicationId) },
+            {
+              $set: {
+                paymentStatus: "paid",
+              },
+            }
+          );
+
+          res.send({ success: true, session });
+        } else {
+          res
+            .status(400)
+            .send({ success: false, message: "Payment not completed" });
+        }
+      } catch (error) {
+        console.error("Error verifying payment:", error);
+        res.status(500).send({ success: false, error: error.message });
+      }
     });
 
     app.listen(port, () => {
