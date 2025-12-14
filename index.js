@@ -137,6 +137,72 @@ async function run() {
       res.send(applications);
     });
 
+    // Get applications for moderators (paid only)
+    app.get("/applications/moderator", async (req, res) => {
+      try {
+        const applications = await applicationCollection
+          .find({
+            paymentStatus: "paid",
+          })
+          .toArray();
+        res.send(applications);
+      } catch (error) {
+        console.error("Error fetching moderator applications:", error);
+        res.status(500).send({
+          message: "Failed to fetch applications",
+          error: error.message,
+        });
+      }
+    });
+
+    // Update application feedback
+    app.patch("/applications/:id/feedback", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { feedback } = req.body;
+
+        const result = await applicationCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              feedback: feedback,
+            },
+          }
+        );
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating feedback:", error);
+        res.status(500).send({
+          message: "Failed to update feedback",
+          error: error.message,
+        });
+      }
+    });
+
+    // Update application status
+    app.patch("/applications/:id/status", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { applicationStatus } = req.body;
+
+        const result = await applicationCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              applicationStatus: applicationStatus,
+            },
+          }
+        );
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating status:", error);
+        res.status(500).send({
+          message: "Failed to update status",
+          error: error.message,
+        });
+      }
+    });
+
     // Delete application (only if pending)
     app.delete("/applications/:id", async (req, res) => {
       try {
@@ -167,7 +233,6 @@ async function run() {
         });
       }
     });
-
 
     // Payment Endpoints
     app.post("/create-checkout-session", async (req, res) => {
