@@ -137,6 +137,37 @@ async function run() {
       res.send(applications);
     });
 
+    // Delete application (only if pending)
+    app.delete("/applications/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const application = await applicationCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!application) {
+          return res.status(404).send({ message: "Application not found" });
+        }
+
+        if (application.applicationStatus !== "pending") {
+          return res
+            .status(400)
+            .send({ message: "Cannot delete application that is not pending" });
+        }
+
+        const result = await applicationCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      } catch (error) {
+        console.error("Error deleting application:", error);
+        res.status(500).send({
+          message: "Failed to delete application",
+          error: error.message,
+        });
+      }
+    });
+
 
     // Payment Endpoints
     app.post("/create-checkout-session", async (req, res) => {
