@@ -62,7 +62,10 @@ async function run() {
         console.log("Attempting to create user:", user);
 
         const query = { email: user.email };
-        const existingUser = await userCollection.findOne(query);
+        const existingUserCursor = await userCollection.find(query);
+        const existingUserArray = await existingUserCursor.toArray();
+        const existingUser =
+          existingUserArray.length > 0 ? existingUserArray[0] : null;
         if (existingUser) {
           console.log("User already exists:", user.email);
           return res.send({ message: "user already exists", insertedId: null });
@@ -80,15 +83,62 @@ async function run() {
       }
     });
 
+    app.get("/users/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const userCursor = await userCollection.find({ email: email });
+        const userArray = await userCursor.toArray();
+        const user = userArray.length > 0 ? userArray[0] : null;
+        if (!user) {
+          return res.status(404).send({ message: "User not found" });
+        }
+        res.send(user);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        res.status(500).send({
+          message: "Failed to fetch user",
+          error: error.message,
+        });
+      }
+    });
+
+    app.patch("/users/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const { displayName, photoURL } = req.body;
+
+        const result = await userCollection.updateOne(
+          { email: email },
+          {
+            $set: {
+              displayName: displayName,
+              photoURL: photoURL,
+            },
+          }
+        );
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating user:", error);
+        res.status(500).send({
+          message: "Failed to update user",
+          error: error.message,
+        });
+      }
+    });
+
     app.get("/scholarships", async (req, res) => {
-      const scholarships = await scholarshipCollection.find().toArray();
+      const scholarshipsCursor = await scholarshipCollection.find();
+      const scholarships = await scholarshipsCursor.toArray();
       res.send(scholarships);
     });
 
     app.get("/scholarships/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
-      const scholarship = await scholarshipCollection.findOne(query);
+      const scholarshipCursor = await scholarshipCollection.find(query);
+      const scholarshipArray = await scholarshipCursor.toArray();
+      const scholarship =
+        scholarshipArray.length > 0 ? scholarshipArray[0] : null;
       res.send(scholarship);
     });
 
@@ -103,10 +153,16 @@ async function run() {
       try {
         const application = req.body;
 
-        const existingApplication = await applicationCollection.findOne({
+        const existingApplicationCursor = await applicationCollection.find({
           scholarshipId: application.scholarshipId,
           userEmail: application.userEmail,
         });
+        const existingApplicationArray =
+          await existingApplicationCursor.toArray();
+        const existingApplication =
+          existingApplicationArray.length > 0
+            ? existingApplicationArray[0]
+            : null;
 
         if (existingApplication) {
           return res.status(400).send({
@@ -126,26 +182,27 @@ async function run() {
     });
 
     app.get("/applications", async (req, res) => {
-      const applications = await applicationCollection.find().toArray();
+      const applicationsCursor = await applicationCollection.find();
+      const applications = await applicationsCursor.toArray();
       res.send(applications);
     });
 
     app.get("/applications/user/:email", async (req, res) => {
       const email = req.params.email;
-      const applications = await applicationCollection
-        .find({ userEmail: email })
-        .toArray();
+      const applicationsCursor = await applicationCollection.find({
+        userEmail: email,
+      });
+      const applications = await applicationsCursor.toArray();
       res.send(applications);
     });
 
     // Get applications for moderators (paid only)
     app.get("/applications/moderator", async (req, res) => {
       try {
-        const applications = await applicationCollection
-          .find({
-            paymentStatus: "paid",
-          })
-          .toArray();
+        const applicationsCursor = await applicationCollection.find({
+          paymentStatus: "paid",
+        });
+        const applications = await applicationsCursor.toArray();
         res.send(applications);
       } catch (error) {
         console.error("Error fetching moderator applications:", error);
@@ -208,9 +265,12 @@ async function run() {
     app.delete("/applications/:id", async (req, res) => {
       try {
         const id = req.params.id;
-        const application = await applicationCollection.findOne({
+        const applicationCursor = await applicationCollection.find({
           _id: new ObjectId(id),
         });
+        const applicationArray = await applicationCursor.toArray();
+        const application =
+          applicationArray.length > 0 ? applicationArray[0] : null;
 
         if (!application) {
           return res.status(404).send({ message: "Application not found" });
@@ -253,9 +313,8 @@ async function run() {
     app.get("/reviews/user/:email", async (req, res) => {
       try {
         const email = req.params.email;
-        const reviews = await reviewCollection
-          .find({ userEmail: email })
-          .toArray();
+        const reviewsCursor = await reviewCollection.find({ userEmail: email });
+        const reviews = await reviewsCursor.toArray();
         res.send(reviews);
       } catch (error) {
         console.error("Error fetching user reviews:", error);
