@@ -522,6 +522,67 @@ async function run() {
       }
     });
 
+    // Analytics endpoint
+    app.get("/analytics", async (req, res) => {
+      try {
+        // Get total users
+        const totalUsersCursor = await userCollection.find();
+        const totalUsersArray = await totalUsersCursor.toArray();
+        const totalUsers = totalUsersArray.length;
+
+        // Get total scholarships
+        const totalScholarshipsCursor = await scholarshipCollection.find();
+        const totalScholarshipsArray = await totalScholarshipsCursor.toArray();
+        const totalScholarships = totalScholarshipsArray.length;
+
+        // Get total fees collected (from paid applications)
+        const paidApplicationsCursor = await applicationCollection.find({
+          paymentStatus: "paid",
+        });
+        const paidApplications = await paidApplicationsCursor.toArray();
+        let totalFeesCollected = 0;
+        for (const appl of paidApplications) {
+          totalFeesCollected += appl.totalAmount || 0;
+        }
+
+        // Get applications count by university
+        const applicationsByUniversityCursor = await applicationCollection.find();
+        const allApplications = await applicationsByUniversityCursor.toArray();
+        const universityCounts = {};
+        allApplications.forEach((app) => {
+          const uni = app.universityName;
+          universityCounts[uni] = (universityCounts[uni] || 0) + 1;
+        });
+        const applicationsByUniversity = Object.entries(universityCounts).map(
+          ([name, count]) => ({ name, count })
+        );
+
+        // Get applications count by scholarship category
+        const categoryCounts = {};
+        allApplications.forEach((app) => {
+          const cat = app.scholarshipCategory;
+          categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        });
+        const applicationsByCategory = Object.entries(categoryCounts).map(
+          ([name, count]) => ({ name, count })
+        );
+
+        res.send({
+          totalUsers,
+          totalScholarships,
+          totalFeesCollected,
+          applicationsByUniversity,
+          applicationsByCategory,
+        });
+      } catch (error) {
+        console.error("Error fetching analytics:", error);
+        res.status(500).send({
+          message: "Failed to fetch analytics",
+          error: error.message,
+        });
+      }
+    });
+
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
     });
