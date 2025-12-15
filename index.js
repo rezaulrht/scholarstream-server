@@ -83,6 +83,21 @@ async function run() {
       }
     });
 
+    // Get all users (for admin)
+    app.get("/users", async (req, res) => {
+      try {
+        const usersCursor = await userCollection.find();
+        const users = await usersCursor.toArray();
+        res.send(users);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        res.status(500).send({
+          message: "Failed to fetch users",
+          error: error.message,
+        });
+      }
+    });
+
     app.get("/users/:email", async (req, res) => {
       try {
         const email = req.params.email;
@@ -121,6 +136,61 @@ async function run() {
         console.error("Error updating user:", error);
         res.status(500).send({
           message: "Failed to update user",
+          error: error.message,
+        });
+      }
+    });
+
+    // Update user role (for admin)
+    app.patch("/users/:id/role", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { role } = req.body;
+
+        if (!["student", "moderator", "admin"].includes(role)) {
+          return res.status(400).send({ message: "Invalid role" });
+        }
+
+        const result = await userCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              role: role,
+            },
+          }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: "User not found" });
+        }
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating user role:", error);
+        res.status(500).send({
+          message: "Failed to update user role",
+          error: error.message,
+        });
+      }
+    });
+
+    // Delete user (for admin)
+    app.delete("/users/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await userCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).send({ message: "User not found" });
+        }
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        res.status(500).send({
+          message: "Failed to delete user",
           error: error.message,
         });
       }
