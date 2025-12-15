@@ -296,6 +296,20 @@ async function run() {
     });
 
     // Review endpoints
+    app.get("/reviews", async (req, res) => {
+      try {
+        const reviewsCursor = await reviewCollection.find();
+        const reviews = await reviewsCursor.toArray();
+        res.send(reviews);
+      } catch (error) {
+        console.error("Error fetching all reviews:", error);
+        res.status(500).send({
+          message: "Failed to fetch reviews",
+          error: error.message,
+        });
+      }
+    });
+
     app.post("/reviews", async (req, res) => {
       try {
         const review = req.body;
