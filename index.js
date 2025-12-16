@@ -56,10 +56,9 @@ async function run() {
     await client.connect();
     await client.db("admin").command({ ping: 1 });
 
-
     app.get("/user/:email/role", async (req, res) => {
       const email = req.params.email;
-      const query = { email: email};
+      const query = { email: email };
       const cursor = await userCollection.find(query);
       const user = await cursor.toArray();
       res.send({ role: user.role || "student" });
@@ -225,6 +224,55 @@ async function run() {
       const scholarship = req.body;
       const result = await scholarshipCollection.insertOne(scholarship);
       res.send(result);
+    });
+
+    // Update scholarship
+    app.patch("/scholarships/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const scholarshipData = req.body;
+
+        const result = await scholarshipCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: scholarshipData,
+          }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: "Scholarship not found" });
+        }
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating scholarship:", error);
+        res.status(500).send({
+          message: "Failed to update scholarship",
+          error: error.message,
+        });
+      }
+    });
+
+    // Delete scholarship
+    app.delete("/scholarships/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await scholarshipCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).send({ message: "Scholarship not found" });
+        }
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error deleting scholarship:", error);
+        res.status(500).send({
+          message: "Failed to delete scholarship",
+          error: error.message,
+        });
+      }
     });
 
     // Applications endpoints
@@ -555,7 +603,8 @@ async function run() {
         }
 
         // Get applications count by university
-        const applicationsByUniversityCursor = await applicationCollection.find();
+        const applicationsByUniversityCursor =
+          await applicationCollection.find();
         const allApplications = await applicationsByUniversityCursor.toArray();
         const universityCounts = {};
         allApplications.forEach((app) => {
