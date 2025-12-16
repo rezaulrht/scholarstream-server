@@ -56,6 +56,15 @@ async function run() {
     await client.connect();
     await client.db("admin").command({ ping: 1 });
 
+
+    app.get("/user/:email/role", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email};
+      const cursor = await userCollection.find(query);
+      const user = await cursor.toArray();
+      res.send({ role: user.role || "student" });
+    });
+
     app.post("/users", async (req, res) => {
       try {
         const user = req.body;
