@@ -289,6 +289,35 @@ async function run() {
       }
     );
 
+    // Get single application (for checkout page)
+    app.get("/applications/:id", verifyFirebaseToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const email = req.decoded_email;
+
+        const application = await applicationCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!application) {
+          return res.status(404).send({ message: "Application not found" });
+        }
+
+        // Verify ownership
+        if (application.userEmail !== email) {
+          return res.status(403).send({ message: "Forbidden Access" });
+        }
+
+        res.send(application);
+      } catch (error) {
+        console.error("Error fetching application:", error);
+        res.status(500).send({
+          message: "Failed to fetch application",
+          error: error.message,
+        });
+      }
+    });
+
     // Create Review
     app.post("/reviews", verifyFirebaseToken, async (req, res) => {
       try {
