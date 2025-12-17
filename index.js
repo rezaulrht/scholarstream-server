@@ -127,6 +127,26 @@ async function run() {
       res.send(scholarship);
     });
 
+    // Get reviews by scholarship (Public)
+    app.get("/reviews/scholarship/:scholarshipId", async (req, res) => {
+      try {
+        const scholarshipId = req.params.scholarshipId;
+        const reviewsCursor = await reviewCollection
+          .find({
+            scholarshipId: scholarshipId,
+          })
+          .sort({ reviewDate: -1 });
+        const reviews = await reviewsCursor.toArray();
+        res.send(reviews);
+      } catch (error) {
+        console.error("Error fetching scholarship reviews:", error);
+        res.status(500).send({
+          message: "Failed to fetch reviews",
+          error: error.message,
+        });
+      }
+    });
+
     // Get all reviews (Moderator only)
     app.get(
       "/reviews",
