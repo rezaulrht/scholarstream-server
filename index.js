@@ -111,10 +111,81 @@ async function run() {
       }
     });
 
+    // Get scholarships with search, filter, sort, and pagination
     app.get("/scholarships", async (req, res) => {
-      const scholarshipsCursor = await scholarshipCollection.find();
-      const scholarships = await scholarshipsCursor.toArray();
-      res.send(scholarships);
+      try {
+        const {
+          search,
+          country,
+          category,
+          sortBy,
+          sortOrder,
+          page = 1,
+          limit = 10,
+        } = req.query;
+
+        // Build query object
+        const query = {};
+
+        // Search by scholarship name, university name, or degree
+        if (search) {
+          query.$or = [
+            { scholarshipName: { $regex: search, $options: "i" } },
+            { universityName: { $regex: search, $options: "i" } },
+            { degree: { $regex: search, $options: "i" } },
+          ];
+        }
+
+        // Filter by country
+        if (country) {
+          query.universityCountry = country;
+        }
+
+        // Filter by category
+        if (category) {
+          query.scholarshipCategory = category;
+        }
+
+        // Build sort object
+        let sort = {};
+        if (sortBy === "fees") {
+          sort.applicationFees = sortOrder === "desc" ? -1 : 1;
+        } else if (sortBy === "deadline") {
+          sort.applicationDeadline = sortOrder === "desc" ? -1 : 1;
+        } else {
+          // Default sort by posted date (newest first)
+          sort.postedDate = -1;
+        }
+
+        // Pagination
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        // Get total count for pagination
+        const totalCount = await scholarshipCollection.countDocuments(query);
+
+        // Fetch scholarships
+        const scholarships = await scholarshipCollection
+          .find(query)
+          .sort(sort)
+          .skip(skip)
+          .limit(limitNum)
+          .toArray();
+
+        res.send({
+          scholarships,
+          totalCount,
+          currentPage: pageNum,
+          totalPages: Math.ceil(totalCount / limitNum),
+        });
+      } catch (error) {
+        console.error("Error fetching scholarships:", error);
+        res.status(500).send({
+          message: "Failed to fetch scholarships",
+          error: error.message,
+        });
+      }
     });
 
     app.get("/scholarships/:id", async (req, res) => {
