@@ -147,6 +147,25 @@ async function run() {
       }
     });
 
+    // Get public reviews for homepage (Public)
+    app.get("/reviews/public", async (req, res) => {
+      try {
+        const limit = parseInt(req.query.limit) || 10;
+        const reviewsCursor = await reviewCollection
+          .find()
+          .sort({ reviewDate: -1 })
+          .limit(limit);
+        const reviews = await reviewsCursor.toArray();
+        res.send(reviews);
+      } catch (error) {
+        console.error("Error fetching public reviews:", error);
+        res.status(500).send({
+          message: "Failed to fetch reviews",
+          error: error.message,
+        });
+      }
+    });
+
     // Get all reviews (Moderator only)
     app.get(
       "/reviews",
@@ -429,6 +448,56 @@ async function run() {
         console.error("Error deleting review:", error);
         res.status(500).send({
           message: "Failed to delete review",
+          error: error.message,
+        });
+      }
+    });
+
+    // Update application (pending only)
+    app.patch("/applications/:id", verifyFirebaseToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const email = req.decoded_email;
+        const { phone, dateOfBirth, gender, currentUniversity, cgpa } =
+          req.body;
+
+        const application = await applicationCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!application) {
+          return res.status(404).send({ message: "Application not found" });
+        }
+
+        // Verify ownership
+        if (application.userEmail !== email) {
+          return res.status(403).send({ message: "Forbidden Access" });
+        }
+
+        // Only allow editing if status is pending
+        if (application.applicationStatus !== "pending") {
+          return res.status(400).send({
+            message: "Cannot edit application that is not pending",
+          });
+        }
+
+        const result = await applicationCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              phone,
+              dateOfBirth,
+              gender,
+              currentUniversity,
+              cgpa,
+            },
+          }
+        );
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating application:", error);
+        res.status(500).send({
+          message: "Failed to update application",
           error: error.message,
         });
       }
