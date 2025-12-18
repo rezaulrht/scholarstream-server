@@ -17,7 +17,6 @@ admin.initializeApp({
 });
 
 const verifyFirebaseToken = async (req, res, next) => {
-  console.log("headers in the middleware", req.headers.authorization);
   const token = req.headers.authorization;
 
   if (!token) {
@@ -30,7 +29,6 @@ const verifyFirebaseToken = async (req, res, next) => {
     req.decoded_email = decodedToken.email;
     next();
   } catch (err) {
-    console.log(err);
     return res.status(401).send({ message: "Unauthorized Access" });
   }
 };
@@ -48,13 +46,14 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
+    await client.connect();
+    await client.db("admin").command({ ping: 1 });
+
     const database = client.db("scholarstreams");
     const userCollection = database.collection("users");
     const scholarshipCollection = database.collection("scholarships");
     const applicationCollection = database.collection("applications");
     const reviewCollection = database.collection("reviews");
-    await client.connect();
-    await client.db("admin").command({ ping: 1 });
 
     // ==========================================
     // Middleware
@@ -73,13 +72,17 @@ async function run() {
 
     const verifyModerator = async (req, res, next) => {
       const email = req.decoded_email;
+
       if (!email) {
         return res.status(401).send({ message: "Unauthorized Access" });
       }
+
       const user = await userCollection.findOne({ email: email });
+
       if (user?.role !== "moderator" && user?.role !== "admin") {
         return res.status(403).send({ message: "Forbidden Access" });
       }
+
       next();
     };
 
@@ -190,6 +193,9 @@ async function run() {
 
     app.get("/scholarships/:id", async (req, res) => {
       const id = req.params.id;
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ message: "Invalid scholarship ID" });
+      }
       const query = { _id: new ObjectId(id) };
       const scholarshipCursor = await scholarshipCollection.find(query);
       const scholarshipArray = await scholarshipCursor.toArray();
@@ -379,11 +385,40 @@ async function run() {
       }
     );
 
+    // Get applications for moderators (paid only) - MUST be before /applications/:id
+    app.get(
+      "/applications/moderator",
+      verifyFirebaseToken,
+      verifyModerator,
+      async (req, res) => {
+        try {
+          const applicationsCursor = applicationCollection.find({
+            paymentStatus: "paid",
+          });
+          const applications = await applicationsCursor.toArray();
+          res.send(applications);
+        } catch (error) {
+          console.error("Error fetching moderator applications:", error);
+          res.status(500).send({
+            message: "Failed to fetch applications",
+            error: error.message,
+          });
+        }
+      }
+    );
+
     // Get single application (for checkout page)
     app.get("/applications/:id", verifyFirebaseToken, async (req, res) => {
       try {
         const id = req.params.id;
         const email = req.decoded_email;
+
+        // Validate ObjectId format
+        if (!ObjectId.isValid(id)) {
+          return res
+            .status(400)
+            .send({ message: "Invalid application ID format" });
+        }
 
         const application = await applicationCollection.findOne({
           _id: new ObjectId(id),
@@ -456,6 +491,10 @@ async function run() {
         const { ratingPoint, reviewComment } = req.body;
         const email = req.decoded_email;
 
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid review ID" });
+        }
+
         // Verify ownership
         const review = await reviewCollection.findOne({
           _id: new ObjectId(id),
@@ -492,6 +531,10 @@ async function run() {
       try {
         const id = req.params.id;
         const email = req.decoded_email;
+
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid review ID" });
+        }
 
         // Get the review to check ownership
         const review = await reviewCollection.findOne({
@@ -532,6 +575,10 @@ async function run() {
         const { phone, dateOfBirth, gender, currentUniversity, cgpa } =
           req.body;
 
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid application ID" });
+        }
+
         const application = await applicationCollection.findOne({
           _id: new ObjectId(id),
         });
@@ -545,24 +592,33 @@ async function run() {
           return res.status(403).send({ message: "Forbidden Access" });
         }
 
-        // Only allow editing if status is pending
-        if (application.applicationStatus !== "pending") {
+        // Allow editing if status is pending or needs revision
+        if (
+          application.applicationStatus !== "pending" &&
+          application.applicationStatus !== "needs revision"
+        ) {
           return res.status(400).send({
-            message: "Cannot edit application that is not pending",
+            message:
+              "Cannot edit application that is not pending or needs revision",
           });
+        }
+
+        // When user edits after revision, change status back to pending
+        const updateData = {
+          phone,
+          dateOfBirth,
+          gender,
+          currentUniversity,
+          cgpa,
+        };
+
+        if (application.applicationStatus === "needs revision") {
+          updateData.applicationStatus = "pending";
         }
 
         const result = await applicationCollection.updateOne(
           { _id: new ObjectId(id) },
-          {
-            $set: {
-              phone,
-              dateOfBirth,
-              gender,
-              currentUniversity,
-              cgpa,
-            },
-          }
+          { $set: updateData }
         );
         res.send(result);
       } catch (error) {
@@ -579,6 +635,10 @@ async function run() {
       try {
         const id = req.params.id;
         const email = req.decoded_email;
+
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid application ID" });
+        }
 
         const applicationCursor = await applicationCollection.find({
           _id: new ObjectId(id),
@@ -666,15 +726,29 @@ async function run() {
         const session_id = req.query.session_id;
         const session = await stripe.checkout.sessions.retrieve(session_id);
         console.log("Payment session:", session);
+        console.log(
+          "Application ID from metadata:",
+          session.metadata.applicationId
+        );
 
         if (session.payment_status === "paid") {
           const applicationId = session.metadata.applicationId;
+
+          // Validate ObjectId
+          if (!ObjectId.isValid(applicationId)) {
+            console.error("Invalid application ID:", applicationId);
+            return res.status(400).send({
+              success: false,
+              message: "Invalid application ID format",
+            });
+          }
 
           await applicationCollection.updateOne(
             { _id: new ObjectId(applicationId) },
             {
               $set: {
                 paymentStatus: "paid",
+                transactionId: session.id,
               },
             }
           );
@@ -695,28 +769,6 @@ async function run() {
     // Moderator Endpoints
     // ==========================================
 
-    // Get applications for moderators (paid only)
-    app.get(
-      "/applications/moderator",
-      verifyFirebaseToken,
-      verifyModerator,
-      async (req, res) => {
-        try {
-          const applicationsCursor = await applicationCollection.find({
-            paymentStatus: "paid",
-          });
-          const applications = await applicationsCursor.toArray();
-          res.send(applications);
-        } catch (error) {
-          console.error("Error fetching moderator applications:", error);
-          res.status(500).send({
-            message: "Failed to fetch applications",
-            error: error.message,
-          });
-        }
-      }
-    );
-
     // Update application feedback
     app.patch(
       "/applications/:id/feedback",
@@ -726,6 +778,10 @@ async function run() {
         try {
           const id = req.params.id;
           const { feedback } = req.body;
+
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: "Invalid application ID" });
+          }
 
           const result = await applicationCollection.updateOne(
             { _id: new ObjectId(id) },
@@ -755,6 +811,10 @@ async function run() {
         try {
           const id = req.params.id;
           const { applicationStatus } = req.body;
+
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: "Invalid application ID" });
+          }
 
           const result = await applicationCollection.updateOne(
             { _id: new ObjectId(id) },
@@ -804,6 +864,10 @@ async function run() {
           const id = req.params.id;
           const { role } = req.body;
 
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: "Invalid user ID" });
+          }
+
           if (!["student", "moderator", "admin"].includes(role)) {
             return res.status(400).send({ message: "Invalid role" });
           }
@@ -840,6 +904,11 @@ async function run() {
       async (req, res) => {
         try {
           const id = req.params.id;
+
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: "Invalid user ID" });
+          }
+
           const result = await userCollection.deleteOne({
             _id: new ObjectId(id),
           });
@@ -881,6 +950,10 @@ async function run() {
           const id = req.params.id;
           const scholarshipData = req.body;
 
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: "Invalid scholarship ID" });
+          }
+
           const result = await scholarshipCollection.updateOne(
             { _id: new ObjectId(id) },
             {
@@ -911,6 +984,11 @@ async function run() {
       async (req, res) => {
         try {
           const id = req.params.id;
+
+          if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: "Invalid scholarship ID" });
+          }
+
           const result = await scholarshipCollection.deleteOne({
             _id: new ObjectId(id),
           });
