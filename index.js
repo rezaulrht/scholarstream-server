@@ -204,6 +204,44 @@ async function run() {
       res.send(scholarship);
     });
 
+    // Get recommended scholarships based on category
+    app.get("/scholarships/:id/recommendations", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const limit = parseInt(req.query.limit) || 6;
+
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid scholarship ID" });
+        }
+
+        // First, get the current scholarship to find its category
+        const currentScholarship = await scholarshipCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!currentScholarship) {
+          return res.status(404).send({ message: "Scholarship not found" });
+        }
+
+        // Find scholarships with the same category, excluding the current one
+        const recommendations = await scholarshipCollection
+          .find({
+            scholarshipCategory: currentScholarship.scholarshipCategory,
+            _id: { $ne: new ObjectId(id) }, // Exclude current scholarship
+          })
+          .limit(limit)
+          .toArray();
+
+        res.send(recommendations);
+      } catch (error) {
+        console.error("Error fetching recommendations:", error);
+        res.status(500).send({
+          message: "Failed to fetch recommendations",
+          error: error.message,
+        });
+      }
+    });
+
     // Get reviews by scholarship (Public)
     app.get("/reviews/scholarship/:scholarshipId", async (req, res) => {
       try {
