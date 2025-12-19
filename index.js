@@ -127,10 +127,8 @@ async function run() {
           limit = 10,
         } = req.query;
 
-        // Build query object
         const query = {};
 
-        // Search by scholarship name, university name, or degree
         if (search) {
           query.$or = [
             { scholarshipName: { $regex: search, $options: "i" } },
@@ -139,36 +137,29 @@ async function run() {
           ];
         }
 
-        // Filter by country
         if (country) {
           query.universityCountry = country;
         }
 
-        // Filter by category
         if (category) {
           query.scholarshipCategory = category;
         }
 
-        // Build sort object
         let sort = {};
         if (sortBy === "fees") {
           sort.applicationFees = sortOrder === "desc" ? -1 : 1;
         } else if (sortBy === "deadline") {
           sort.applicationDeadline = sortOrder === "desc" ? -1 : 1;
         } else {
-          // Default sort by posted date (newest first)
           sort.postedDate = -1;
         }
 
-        // Pagination
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
 
-        // Get total count for pagination
         const totalCount = await scholarshipCollection.countDocuments(query);
 
-        // Fetch scholarships
         const scholarships = await scholarshipCollection
           .find(query)
           .sort(sort)
@@ -214,7 +205,6 @@ async function run() {
           return res.status(400).send({ message: "Invalid scholarship ID" });
         }
 
-        // First, get the current scholarship to find its category
         const currentScholarship = await scholarshipCollection.findOne({
           _id: new ObjectId(id),
         });
@@ -223,11 +213,10 @@ async function run() {
           return res.status(404).send({ message: "Scholarship not found" });
         }
 
-        // Find scholarships with the same category, excluding the current one
         const recommendations = await scholarshipCollection
           .find({
             scholarshipCategory: currentScholarship.scholarshipCategory,
-            _id: { $ne: new ObjectId(id) }, // Exclude current scholarship
+            _id: { $ne: new ObjectId(id) },
           })
           .limit(limit)
           .toArray();
@@ -373,7 +362,6 @@ async function run() {
         const application = req.body;
         const email = req.decoded_email;
 
-        // Verify the user is creating application for themselves
         if (application.userEmail !== email) {
           return res.status(403).send({ message: "Forbidden Access" });
         }
@@ -389,14 +377,12 @@ async function run() {
             ? existingApplicationArray[0]
             : null;
 
-        // Allow reapplication only if previous application was rejected
         if (existingApplication) {
           if (existingApplication.applicationStatus !== "rejected") {
             return res.status(400).send({
               message: "You have already applied for this scholarship",
             });
           }
-          // If previous application was rejected, allow creating a new application
         }
 
         const result = await applicationCollection.insertOne(application);
@@ -455,7 +441,6 @@ async function run() {
         const id = req.params.id;
         const email = req.decoded_email;
 
-        // Validate ObjectId format
         if (!ObjectId.isValid(id)) {
           return res
             .status(400)
@@ -470,7 +455,6 @@ async function run() {
           return res.status(404).send({ message: "Application not found" });
         }
 
-        // Verify ownership
         if (application.userEmail !== email) {
           return res.status(403).send({ message: "Forbidden Access" });
         }
@@ -491,7 +475,6 @@ async function run() {
         const review = req.body;
         const email = req.decoded_email;
 
-        // Verify the user is creating review for themselves
         if (review.userEmail !== email) {
           return res.status(403).send({ message: "Forbidden Access" });
         }
@@ -537,7 +520,6 @@ async function run() {
           return res.status(400).send({ message: "Invalid review ID" });
         }
 
-        // Verify ownership
         const review = await reviewCollection.findOne({
           _id: new ObjectId(id),
         });
@@ -578,7 +560,6 @@ async function run() {
           return res.status(400).send({ message: "Invalid review ID" });
         }
 
-        // Get the review to check ownership
         const review = await reviewCollection.findOne({
           _id: new ObjectId(id),
         });
@@ -586,7 +567,6 @@ async function run() {
           return res.status(404).send({ message: "Review not found" });
         }
 
-        // Check if user is the owner or a moderator/admin
         const user = await userCollection.findOne({ email: email });
         const isModerator =
           user?.role === "moderator" || user?.role === "admin";
@@ -629,12 +609,10 @@ async function run() {
           return res.status(404).send({ message: "Application not found" });
         }
 
-        // Verify ownership
         if (application.userEmail !== email) {
           return res.status(403).send({ message: "Forbidden Access" });
         }
 
-        // Allow editing if status is pending or needs revision
         if (
           application.applicationStatus !== "pending" &&
           application.applicationStatus !== "needs revision"
@@ -645,7 +623,6 @@ async function run() {
           });
         }
 
-        // When user edits after revision, change status back to pending
         const updateData = {
           phone,
           dateOfBirth,
@@ -693,7 +670,6 @@ async function run() {
           return res.status(404).send({ message: "Application not found" });
         }
 
-        // Verify ownership
         if (application.userEmail !== email) {
           return res.status(403).send({ message: "Forbidden Access" });
         }
@@ -776,7 +752,6 @@ async function run() {
         if (session.payment_status === "paid") {
           const applicationId = session.metadata.applicationId;
 
-          // Validate ObjectId
           if (!ObjectId.isValid(applicationId)) {
             console.error("Invalid application ID:", applicationId);
             return res.status(400).send({
@@ -1071,18 +1046,15 @@ async function run() {
       verifyAdmin,
       async (req, res) => {
         try {
-          // Get total users
           const totalUsersCursor = await userCollection.find();
           const totalUsersArray = await totalUsersCursor.toArray();
           const totalUsers = totalUsersArray.length;
 
-          // Get total scholarships
           const totalScholarshipsCursor = await scholarshipCollection.find();
           const totalScholarshipsArray =
             await totalScholarshipsCursor.toArray();
           const totalScholarships = totalScholarshipsArray.length;
 
-          // Get total fees collected (from paid applications)
           const paidApplicationsCursor = await applicationCollection.find({
             paymentStatus: "paid",
           });
@@ -1092,7 +1064,6 @@ async function run() {
             totalFeesCollected += appl.totalAmount || 0;
           }
 
-          // Get applications count by university
           const applicationsByUniversityCursor =
             await applicationCollection.find();
           const allApplications =
@@ -1106,7 +1077,6 @@ async function run() {
             ([name, count]) => ({ name, count })
           );
 
-          // Get applications count by scholarship category
           const categoryCounts = {};
           allApplications.forEach((app) => {
             const cat = app.scholarshipCategory;
