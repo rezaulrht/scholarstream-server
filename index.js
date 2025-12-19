@@ -10,7 +10,10 @@ app.use(cors());
 
 const admin = require("firebase-admin");
 
-const serviceAccount = require("./scholar-stream-adminsdk-key.json");
+// const serviceAccount = require("./scholar-stream-adminsdk-key.json");
+
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -47,7 +50,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     await client.connect();
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
 
     const database = client.db("scholarstreams");
     const userCollection = database.collection("users");

@@ -1,3 +1,4 @@
 node_modules
 .env
 scholar-stream-adminsdk-key.json
+.vercel
