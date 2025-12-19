@@ -351,10 +351,14 @@ async function run() {
             ? existingApplicationArray[0]
             : null;
 
+        // Allow reapplication only if previous application was rejected
         if (existingApplication) {
-          return res.status(400).send({
-            message: "You have already applied for this scholarship",
-          });
+          if (existingApplication.applicationStatus !== "rejected") {
+            return res.status(400).send({
+              message: "You have already applied for this scholarship",
+            });
+          }
+          // If previous application was rejected, allow creating a new application
         }
 
         const result = await applicationCollection.insertOne(application);
