@@ -12,7 +12,9 @@ const admin = require("firebase-admin");
 
 // const serviceAccount = require("./scholar-stream-adminsdk-key.json");
 
-const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
+  "utf8"
+);
 const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
@@ -49,7 +51,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     // await client.db("admin").command({ ping: 1 });
 
     const database = client.db("scholarstreams");
@@ -1110,6 +1112,8 @@ async function run() {
       res.send("ScholarStream Server is Running");
     });
 
+    // Only start server if not in serverless environment
+    // Uncomment for local development:
     // app.listen(port, () => {
     //   console.log(`Server is running on port ${port}`);
     // });
@@ -1118,3 +1122,6 @@ async function run() {
   }
 }
 run().catch(console.dir);
+
+// Export for Vercel serverless functions
+module.exports = app;
