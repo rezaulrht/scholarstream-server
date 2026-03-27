@@ -1,5 +1,5 @@
-const { ObjectId } = require("mongodb");
-const { getCollections } = require("../config/db");
+const mongoose = require("mongoose");
+const Application = require("../models/Application");
 const stripe = require("../config/stripe");
 
 const createCheckoutSession = async (req, res) => {
@@ -40,17 +40,16 @@ const createCheckoutSession = async (req, res) => {
 
 const handlePaymentSuccess = async (req, res) => {
   try {
-    const { applicationCollection } = getCollections();
     const session_id = req.query.session_id;
     const session = await stripe.checkout.sessions.retrieve(session_id);
 
     if (session.payment_status === "paid") {
       const applicationId = session.metadata.applicationId;
-      if (!ObjectId.isValid(applicationId)) {
+      if (!mongoose.Types.ObjectId.isValid(applicationId)) {
         return res.status(400).send({ success: false, message: "Invalid application ID format" });
       }
-      await applicationCollection.updateOne(
-        { _id: new ObjectId(applicationId) },
+      await Application.updateOne(
+        { _id: applicationId },
         { $set: { paymentStatus: "paid", transactionId: session.id } }
       );
       res.send({ success: true, session });

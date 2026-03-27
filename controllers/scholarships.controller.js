@@ -1,9 +1,8 @@
-const { ObjectId } = require("mongodb");
-const { getCollections } = require("../config/db");
+const mongoose = require("mongoose");
+const Scholarship = require("../models/Scholarship");
 
 const getScholarships = async (req, res) => {
   try {
-    const { scholarshipCollection } = getCollections();
     const { search, country, category, sortBy, sortOrder, page = 1, limit = 10 } = req.query;
 
     const query = {};
@@ -30,13 +29,8 @@ const getScholarships = async (req, res) => {
     const limitNum = Math.min(parseInt(limit), 100);
     const skip = (pageNum - 1) * limitNum;
 
-    const totalCount = await scholarshipCollection.countDocuments(query);
-    const scholarships = await scholarshipCollection
-      .find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum)
-      .toArray();
+    const totalCount = await Scholarship.countDocuments(query);
+    const scholarships = await Scholarship.find(query).sort(sort).skip(skip).limit(limitNum);
 
     res.send({ scholarships, totalCount, currentPage: pageNum, totalPages: Math.ceil(totalCount / limitNum) });
   } catch (error) {
@@ -46,20 +40,19 @@ const getScholarships = async (req, res) => {
 
 const getScholarshipRecommendations = async (req, res) => {
   try {
-    const { scholarshipCollection } = getCollections();
     const id = req.params.id;
     const limit = parseInt(req.query.limit) || 6;
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).send({ message: "Invalid scholarship ID" });
     }
-    const current = await scholarshipCollection.findOne({ _id: new ObjectId(id) });
+    const current = await Scholarship.findById(id);
     if (!current) {
       return res.status(404).send({ message: "Scholarship not found" });
     }
-    const recommendations = await scholarshipCollection
-      .find({ scholarshipCategory: current.scholarshipCategory, _id: { $ne: new ObjectId(id) } })
-      .limit(limit)
-      .toArray();
+    const recommendations = await Scholarship.find({
+      scholarshipCategory: current.scholarshipCategory,
+      _id: { $ne: id },
+    }).limit(limit);
     res.send(recommendations);
   } catch (error) {
     res.status(500).send({ message: "Failed to fetch recommendations", error: error.message });
@@ -68,12 +61,11 @@ const getScholarshipRecommendations = async (req, res) => {
 
 const getScholarshipById = async (req, res) => {
   try {
-    const { scholarshipCollection } = getCollections();
     const id = req.params.id;
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).send({ message: "Invalid scholarship ID" });
     }
-    const scholarship = await scholarshipCollection.findOne({ _id: new ObjectId(id) });
+    const scholarship = await Scholarship.findById(id);
     res.send(scholarship);
   } catch (error) {
     res.status(500).send({ message: "Failed to fetch scholarship", error: error.message });
@@ -82,9 +74,8 @@ const getScholarshipById = async (req, res) => {
 
 const addScholarship = async (req, res) => {
   try {
-    const { scholarshipCollection } = getCollections();
-    const result = await scholarshipCollection.insertOne(req.body);
-    res.send(result);
+    const doc = await Scholarship.create(req.body);
+    res.send({ acknowledged: true, insertedId: doc._id });
   } catch (error) {
     res.status(500).send({ message: "Failed to add scholarship", error: error.message });
   }
@@ -92,15 +83,11 @@ const addScholarship = async (req, res) => {
 
 const updateScholarship = async (req, res) => {
   try {
-    const { scholarshipCollection } = getCollections();
     const id = req.params.id;
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).send({ message: "Invalid scholarship ID" });
     }
-    const result = await scholarshipCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: req.body }
-    );
+    const result = await Scholarship.updateOne({ _id: id }, { $set: req.body });
     if (result.matchedCount === 0) {
       return res.status(404).send({ message: "Scholarship not found" });
     }
@@ -112,12 +99,11 @@ const updateScholarship = async (req, res) => {
 
 const deleteScholarship = async (req, res) => {
   try {
-    const { scholarshipCollection } = getCollections();
     const id = req.params.id;
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).send({ message: "Invalid scholarship ID" });
     }
-    const result = await scholarshipCollection.deleteOne({ _id: new ObjectId(id) });
+    const result = await Scholarship.deleteOne({ _id: id });
     if (result.deletedCount === 0) {
       return res.status(404).send({ message: "Scholarship not found" });
     }

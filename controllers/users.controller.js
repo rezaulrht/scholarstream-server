@@ -1,18 +1,15 @@
-const { ObjectId } = require("mongodb");
-const { getCollections } = require("../config/db");
+const mongoose = require("mongoose");
+const User = require("../models/User");
 
 const createUser = async (req, res) => {
   try {
-    const { userCollection } = getCollections();
     const user = req.body;
-    const existingUser = await userCollection.findOne({ email: user.email });
+    const existingUser = await User.findOne({ email: user.email });
     if (existingUser) {
       return res.send({ message: "user already exists", insertedId: null });
     }
-    user.role = "student";
-    user.createdAt = new Date();
-    const result = await userCollection.insertOne(user);
-    res.send(result);
+    const doc = await User.create({ ...user, role: "student", createdAt: new Date() });
+    res.send({ acknowledged: true, insertedId: doc._id });
   } catch (error) {
     res.status(500).send({ message: "Failed to store user", error: error.message });
   }
@@ -20,12 +17,11 @@ const createUser = async (req, res) => {
 
 const getUserRole = async (req, res) => {
   try {
-    const { userCollection } = getCollections();
     const email = req.params.email;
     if (email !== req.decoded_email) {
       return res.status(403).send({ message: "Forbidden Access" });
     }
-    const user = await userCollection.findOne({ email });
+    const user = await User.findOne({ email });
     res.send({ role: user?.role || "student" });
   } catch (error) {
     res.status(500).send({ message: "Failed to fetch role", error: error.message });
@@ -34,8 +30,7 @@ const getUserRole = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const { userCollection } = getCollections();
-    const users = await userCollection.find().toArray();
+    const users = await User.find();
     res.send(users);
   } catch (error) {
     res.status(500).send({ message: "Failed to fetch users", error: error.message });
@@ -44,12 +39,11 @@ const getAllUsers = async (req, res) => {
 
 const getUserByEmail = async (req, res) => {
   try {
-    const { userCollection } = getCollections();
     const email = req.params.email;
     if (email !== req.decoded_email) {
       return res.status(403).send({ message: "Forbidden Access" });
     }
-    const user = await userCollection.findOne({ email });
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).send({ message: "User not found" });
     }
@@ -61,16 +55,12 @@ const getUserByEmail = async (req, res) => {
 
 const updateUserProfile = async (req, res) => {
   try {
-    const { userCollection } = getCollections();
     const email = req.params.email;
     if (email !== req.decoded_email) {
       return res.status(403).send({ message: "Forbidden Access" });
     }
     const { displayName, photoURL } = req.body;
-    const result = await userCollection.updateOne(
-      { email },
-      { $set: { displayName, photoURL } }
-    );
+    const result = await User.updateOne({ email }, { $set: { displayName, photoURL } });
     res.send(result);
   } catch (error) {
     res.status(500).send({ message: "Failed to update user", error: error.message });
@@ -79,19 +69,15 @@ const updateUserProfile = async (req, res) => {
 
 const updateUserRole = async (req, res) => {
   try {
-    const { userCollection } = getCollections();
     const id = req.params.id;
     const { role } = req.body;
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).send({ message: "Invalid user ID" });
     }
     if (!["student", "moderator", "admin"].includes(role)) {
       return res.status(400).send({ message: "Invalid role" });
     }
-    const result = await userCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { role } }
-    );
+    const result = await User.updateOne({ _id: id }, { $set: { role } });
     if (result.matchedCount === 0) {
       return res.status(404).send({ message: "User not found" });
     }
@@ -103,12 +89,11 @@ const updateUserRole = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   try {
-    const { userCollection } = getCollections();
     const id = req.params.id;
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).send({ message: "Invalid user ID" });
     }
-    const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
+    const result = await User.deleteOne({ _id: id });
     if (result.deletedCount === 0) {
       return res.status(404).send({ message: "User not found" });
     }

@@ -1,6 +1,6 @@
 // middleware/auth.js
 const admin = require("firebase-admin");
-const { getCollections } = require("../config/db");
+const User = require("../models/User");
 
 if (!process.env.FB_SERVICE_KEY) {
   throw new Error("FB_SERVICE_KEY environment variable is not set");
@@ -37,8 +37,7 @@ const verifyAdmin = async (req, res, next) => {
   if (!email) {
     return res.status(401).send({ message: "Unauthorized Access" });
   }
-  const { userCollection } = getCollections();
-  const user = await userCollection.findOne({ email });
+  const user = await User.findOne({ email });
   if (user?.role !== "admin") {
     return res.status(403).send({ message: "Forbidden Access" });
   }
@@ -50,8 +49,7 @@ const verifyModerator = async (req, res, next) => {
   if (!email) {
     return res.status(401).send({ message: "Unauthorized Access" });
   }
-  const { userCollection } = getCollections();
-  const user = await userCollection.findOne({ email });
+  const user = await User.findOne({ email });
   if (user?.role !== "moderator" && user?.role !== "admin") {
     return res.status(403).send({ message: "Forbidden Access" });
   }
