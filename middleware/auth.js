@@ -2,10 +2,17 @@
 const admin = require("firebase-admin");
 const { getCollections } = require("../config/db");
 
+if (!process.env.FB_SERVICE_KEY) {
+  throw new Error("FB_SERVICE_KEY environment variable is not set");
+}
+
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString("utf8");
-admin.initializeApp({
-  credential: admin.credential.cert(JSON.parse(decoded)),
-});
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(JSON.parse(decoded)),
+  });
+}
 
 const verifyFirebaseToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
