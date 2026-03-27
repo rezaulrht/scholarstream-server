@@ -23,13 +23,17 @@ router.post("/users", async (req, res) => {
 });
 
 router.get("/user/:email/role", verifyFirebaseToken, async (req, res) => {
-  const { userCollection } = getCollections();
-  const email = req.params.email;
-  if (email !== req.decoded_email) {
-    return res.status(403).send({ message: "Forbidden Access" });
+  try {
+    const { userCollection } = getCollections();
+    const email = req.params.email;
+    if (email !== req.decoded_email) {
+      return res.status(403).send({ message: "Forbidden Access" });
+    }
+    const user = await userCollection.findOne({ email });
+    res.send({ role: user?.role || "student" });
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch role", error: error.message });
   }
-  const user = await userCollection.findOne({ email });
-  res.send({ role: user?.role || "student" });
 });
 
 router.get("/users", verifyFirebaseToken, verifyAdmin, async (req, res) => {
