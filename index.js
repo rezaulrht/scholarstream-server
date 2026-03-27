@@ -13,7 +13,7 @@ const admin = require("firebase-admin");
 // const serviceAccount = require("./scholar-stream-adminsdk-key.json");
 
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
-  "utf8"
+  "utf8",
 );
 const serviceAccount = JSON.parse(decoded);
 
@@ -292,7 +292,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     // ==========================================
@@ -349,7 +349,7 @@ async function run() {
               displayName: displayName,
               photoURL: photoURL,
             },
-          }
+          },
         );
         res.send(result);
       } catch (error) {
@@ -415,7 +415,7 @@ async function run() {
         });
         const applications = await applicationsCursor.toArray();
         res.send(applications);
-      }
+      },
     );
 
     // Get applications for moderators (paid only) - MUST be before /applications/:id
@@ -437,7 +437,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     // Get single application (for checkout page)
@@ -543,7 +543,7 @@ async function run() {
               reviewComment: reviewComment,
               reviewDate: new Date(),
             },
-          }
+          },
         );
         res.send(result);
       } catch (error) {
@@ -642,7 +642,7 @@ async function run() {
 
         const result = await applicationCollection.updateOne(
           { _id: new ObjectId(id) },
-          { $set: updateData }
+          { $set: updateData },
         );
         res.send(result);
       } catch (error) {
@@ -741,7 +741,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     app.patch("/payment-success", verifyFirebaseToken, async (req, res) => {
@@ -751,7 +751,7 @@ async function run() {
         console.log("Payment session:", session);
         console.log(
           "Application ID from metadata:",
-          session.metadata.applicationId
+          session.metadata.applicationId,
         );
 
         if (session.payment_status === "paid") {
@@ -772,7 +772,7 @@ async function run() {
                 paymentStatus: "paid",
                 transactionId: session.id,
               },
-            }
+            },
           );
 
           res.send({ success: true, session });
@@ -811,7 +811,7 @@ async function run() {
               $set: {
                 feedback: feedback,
               },
-            }
+            },
           );
           res.send(result);
         } catch (error) {
@@ -821,7 +821,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     // Update application status
@@ -844,7 +844,7 @@ async function run() {
               $set: {
                 applicationStatus: applicationStatus,
               },
-            }
+            },
           );
           res.send(result);
         } catch (error) {
@@ -854,7 +854,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     // ==========================================
@@ -900,7 +900,7 @@ async function run() {
               $set: {
                 role: role,
               },
-            }
+            },
           );
 
           if (result.matchedCount === 0) {
@@ -915,7 +915,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     // Delete user
@@ -947,7 +947,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     // Add Scholarship
@@ -959,7 +959,7 @@ async function run() {
         const scholarship = req.body;
         const result = await scholarshipCollection.insertOne(scholarship);
         res.send(result);
-      }
+      },
     );
 
     // Update scholarship
@@ -980,7 +980,7 @@ async function run() {
             { _id: new ObjectId(id) },
             {
               $set: scholarshipData,
-            }
+            },
           );
 
           if (result.matchedCount === 0) {
@@ -995,7 +995,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     // Delete scholarship
@@ -1027,7 +1027,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     // Get all applications (Admin view?) - The user requirement asked for grouping
@@ -1041,7 +1041,7 @@ async function run() {
         const applicationsCursor = await applicationCollection.find();
         const applications = await applicationsCursor.toArray();
         res.send(applications);
-      }
+      },
     );
 
     // Analytics
@@ -1079,7 +1079,7 @@ async function run() {
             universityCounts[uni] = (universityCounts[uni] || 0) + 1;
           });
           const applicationsByUniversity = Object.entries(universityCounts).map(
-            ([name, count]) => ({ name, count })
+            ([name, count]) => ({ name, count }),
           );
 
           const categoryCounts = {};
@@ -1088,7 +1088,7 @@ async function run() {
             categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
           });
           const applicationsByCategory = Object.entries(categoryCounts).map(
-            ([name, count]) => ({ name, count })
+            ([name, count]) => ({ name, count }),
           );
 
           res.send({
@@ -1105,7 +1105,7 @@ async function run() {
             error: error.message,
           });
         }
-      }
+      },
     );
 
     app.get("/", (req, res) => {
@@ -1114,9 +1114,9 @@ async function run() {
 
     // Only start server if not in serverless environment
     // Uncomment for local development:
-    // app.listen(port, () => {
-    //   console.log(`Server is running on port ${port}`);
-    // });
+    app.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+    });
   } finally {
     // await client.close();
   }
