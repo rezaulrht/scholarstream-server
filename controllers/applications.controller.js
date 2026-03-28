@@ -1,5 +1,12 @@
 const mongoose = require("mongoose");
 const Application = require("../models/Application");
+const mailer = require("../config/mailer");
+const {
+  applicationSubmittedTemplate,
+  applicationAcceptedTemplate,
+  applicationRejectedTemplate,
+  applicationRevisionTemplate,
+} = require("../utils/emailTemplates");
 
 const createApplication = async (req, res) => {
   try {
@@ -16,6 +23,17 @@ const createApplication = async (req, res) => {
       return res.status(400).send({ message: "You have already applied for this scholarship" });
     }
     const doc = await Application.create(application);
+    const { subject, html } = applicationSubmittedTemplate({
+      userName: doc.userName,
+      scholarshipName: doc.scholarshipName,
+      universityName: doc.universityName,
+    });
+    mailer.sendMail({
+      from: `"ScholarStream" <${process.env.EMAIL_USER}>`,
+      to: doc.userEmail,
+      subject,
+      html,
+    }).catch((err) => console.error("Submission email failed:", err));
     res.send({ acknowledged: true, insertedId: doc._id });
   } catch (error) {
     res.status(500).send({ message: "Failed to create application", error: error.message });
@@ -164,7 +182,6 @@ const deleteApplication = async (req, res) => {
   }
 };
 
-// Atomic: set feedback + status in one DB write
 const reviewApplication = async (req, res) => {
   try {
     const id = req.params.id;
@@ -172,12 +189,37 @@ const reviewApplication = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).send({ message: "Invalid application ID" });
     }
+
+    const application = await Application.findById(id);
+    if (!application) {
+      return res.status(404).send({ message: "Application not found" });
+    }
+
     const update = { applicationStatus };
     if (feedback !== undefined) update.feedback = feedback;
     const result = await Application.updateOne({ _id: id }, { $set: update });
-    if (result.matchedCount === 0) {
-      return res.status(404).send({ message: "Application not found" });
+
+    // Fire-and-forget email based on new status
+    const templateData = {
+      userName: application.userName,
+      scholarshipName: application.scholarshipName,
+      universityName: application.universityName,
+      feedback,
+    };
+    let emailTemplate;
+    if (applicationStatus === "accepted") emailTemplate = applicationAcceptedTemplate(templateData);
+    else if (applicationStatus === "rejected") emailTemplate = applicationRejectedTemplate(templateData);
+    else if (applicationStatus === "needs revision") emailTemplate = applicationRevisionTemplate(templateData);
+
+    if (emailTemplate) {
+      mailer.sendMail({
+        from: `"ScholarStream" <${process.env.EMAIL_USER}>`,
+        to: application.userEmail,
+        subject: emailTemplate.subject,
+        html: emailTemplate.html,
+      }).catch((err) => console.error("Status email failed:", err));
     }
+
     res.send(result);
   } catch (error) {
     res.status(500).send({ message: "Failed to review application", error: error.message });
