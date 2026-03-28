@@ -31,6 +31,7 @@ app.use("/", require("./routes/reviews"));
 app.use("/", require("./routes/payment"));
 app.use("/", require("./routes/analytics"));
 app.use("/", require("./routes/newsletter"));
+app.use("/", require("./routes/email"));
 
 app.get("/", (req, res) => res.send("ScholarStream Server is Running"));
 
