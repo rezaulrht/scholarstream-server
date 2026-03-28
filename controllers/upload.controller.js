@@ -1,5 +1,6 @@
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const crypto = require("crypto");
 const r2Client = require("../config/r2");
 
 const getUploadUrls = async (req, res) => {
@@ -16,10 +17,10 @@ const getUploadUrls = async (req, res) => {
   }
 
   try {
-    const userId = req.decoded.uid;
+    const userKey = req.decoded_email;
     const results = await Promise.all(
       files.map(async ({ fileName, fileType }) => {
-        const key = `applications/${userId}/${Date.now()}-${fileName}`;
+        const key = `applications/${userKey}/${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${fileName}`;
         const command = new PutObjectCommand({
           Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
           Key: key,
