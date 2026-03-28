@@ -26,6 +26,7 @@ const applicationSchema = new mongoose.Schema(
     paymentStatus: { type: String, enum: ["pending", "paid"], default: "pending" },
     transactionId: String,
     feedback: String,
+    documentUrls: [String],
     appliedDate: { type: Date, default: Date.now },
   },
   { versionKey: false, strict: false }
