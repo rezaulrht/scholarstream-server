@@ -46,8 +46,18 @@ const getUserApplications = async (req, res) => {
 
 const getModeratorApplications = async (req, res) => {
   try {
-    const applications = await Application.find({ paymentStatus: "paid" });
-    res.send(applications);
+    const { page = 1, limit = 20, status } = req.query;
+    const query = { paymentStatus: "paid" };
+    if (status && status !== "all") query.applicationStatus = status;
+
+    const pageNum = parseInt(page);
+    const limitNum = Math.min(parseInt(limit), 100);
+    const skip = (pageNum - 1) * limitNum;
+
+    const totalCount = await Application.countDocuments(query);
+    const applications = await Application.find(query).sort({ appliedDate: -1 }).skip(skip).limit(limitNum);
+
+    res.send({ applications, totalCount, currentPage: pageNum, totalPages: Math.ceil(totalCount / limitNum) });
   } catch (error) {
     res.status(500).send({ message: "Failed to fetch applications", error: error.message });
   }
@@ -154,4 +164,24 @@ const deleteApplication = async (req, res) => {
   }
 };
 
-module.exports = { createApplication, getAllApplications, getUserApplications, getModeratorApplications, getApplicationById, updateApplicationFeedback, updateApplicationStatus, updateApplication, deleteApplication };
+// Atomic: set feedback + status in one DB write
+const reviewApplication = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { feedback, applicationStatus } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).send({ message: "Invalid application ID" });
+    }
+    const update = { applicationStatus };
+    if (feedback !== undefined) update.feedback = feedback;
+    const result = await Application.updateOne({ _id: id }, { $set: update });
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ message: "Application not found" });
+    }
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to review application", error: error.message });
+  }
+};
+
+module.exports = { createApplication, getAllApplications, getUserApplications, getModeratorApplications, getApplicationById, reviewApplication, updateApplicationFeedback, updateApplicationStatus, updateApplication, deleteApplication };

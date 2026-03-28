@@ -113,4 +113,13 @@ const deleteScholarship = async (req, res) => {
   }
 };
 
-module.exports = { getScholarships, getScholarshipRecommendations, getScholarshipById, addScholarship, updateScholarship, deleteScholarship };
+const getCountries = async (req, res) => {
+  try {
+    const countries = await Scholarship.distinct("universityCountry");
+    res.send(countries.filter(Boolean).sort());
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch countries", error: error.message });
+  }
+};
+
+module.exports = { getScholarships, getCountries, getScholarshipRecommendations, getScholarshipById, addScholarship, updateScholarship, deleteScholarship };

@@ -8,6 +8,7 @@ router.get("/applications/user/:email", verifyFirebaseToken, c.getUserApplicatio
 // MUST be before /:id — otherwise "moderator" matches as an id param
 router.get("/applications/moderator", verifyFirebaseToken, verifyModerator, c.getModeratorApplications);
 router.get("/applications/:id", verifyFirebaseToken, c.getApplicationById);
+router.patch("/applications/:id/review", verifyFirebaseToken, verifyModerator, c.reviewApplication);
 router.patch("/applications/:id/feedback", verifyFirebaseToken, verifyModerator, c.updateApplicationFeedback);
 router.patch("/applications/:id/status", verifyFirebaseToken, verifyModerator, c.updateApplicationStatus);
 router.patch("/applications/:id", verifyFirebaseToken, c.updateApplication);

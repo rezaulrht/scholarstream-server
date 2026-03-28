@@ -30,8 +30,24 @@ const getUserRole = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find();
-    res.send(users);
+    const { search, role, page = 1, limit = 20 } = req.query;
+    const query = {};
+    if (search) {
+      query.$or = [
+        { displayName: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
+    }
+    if (role && role !== "all") query.role = role;
+
+    const pageNum = parseInt(page);
+    const limitNum = Math.min(parseInt(limit), 100);
+    const skip = (pageNum - 1) * limitNum;
+
+    const totalCount = await User.countDocuments(query);
+    const users = await User.find(query).skip(skip).limit(limitNum);
+
+    res.send({ users, totalCount, currentPage: pageNum, totalPages: Math.ceil(totalCount / limitNum) });
   } catch (error) {
     res.status(500).send({ message: "Failed to fetch users", error: error.message });
   }
