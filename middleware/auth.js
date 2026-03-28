@@ -56,4 +56,4 @@ const verifyModerator = async (req, res, next) => {
   next();
 };
 
-module.exports = { verifyFirebaseToken, verifyAdmin, verifyModerator };
+module.exports = { verifyFirebaseToken, verifyAdmin, verifyModerator, admin };
