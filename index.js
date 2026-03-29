@@ -6,7 +6,26 @@ const { connectDB } = require("./config/db");
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: process.env.SITE_DOMAIN }));
+
+const normalizeOrigin = (value = "") => value.trim().replace(/\/$/, "");
+const allowedOrigins = (process.env.SITE_DOMAIN || "")
+  .split(",")
+  .map((origin) => normalizeOrigin(origin))
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    // Allow requests with no Origin header (curl/postman/server-to-server).
+    if (!origin) return callback(null, true);
+
+    const normalizedRequestOrigin = normalizeOrigin(origin);
+    if (allowedOrigins.includes(normalizedRequestOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+}));
 
 // General rate limit: 100 requests per minute per IP
 app.use(rateLimit({

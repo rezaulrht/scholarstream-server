@@ -4,6 +4,7 @@ const stripe = require("../config/stripe");
 
 const createCheckoutSession = async (req, res) => {
   try {
+    const siteDomain = (process.env.SITE_DOMAIN || "").replace(/\/$/, "");
     const paymentInfo = req.body;
     const amount = Math.round(parseFloat(paymentInfo.totalAmount) * 100);
 
@@ -28,8 +29,8 @@ const createCheckoutSession = async (req, res) => {
         scholarshipId: paymentInfo.scholarshipId,
         userEmail: paymentInfo.userEmail,
       },
-      success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-failed`,
+      success_url: `${siteDomain}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteDomain}/dashboard/payment-failed`,
     });
 
     res.send({ url: session.url });
