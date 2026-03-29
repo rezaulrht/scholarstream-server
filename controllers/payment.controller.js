@@ -35,7 +35,12 @@ const createCheckoutSession = async (req, res) => {
 
     res.send({ url: session.url });
   } catch (error) {
-    res.status(500).send({ message: "Failed to create payment session", error: error.message });
+    res
+      .status(500)
+      .send({
+        message: "Failed to create payment session",
+        error: error.message,
+      });
   }
 };
 
@@ -47,15 +52,19 @@ const handlePaymentSuccess = async (req, res) => {
     if (session.payment_status === "paid") {
       const applicationId = session.metadata.applicationId;
       if (!mongoose.Types.ObjectId.isValid(applicationId)) {
-        return res.status(400).send({ success: false, message: "Invalid application ID format" });
+        return res
+          .status(400)
+          .send({ success: false, message: "Invalid application ID format" });
       }
       await Application.updateOne(
         { _id: applicationId },
-        { $set: { paymentStatus: "paid", transactionId: session.id } }
+        { $set: { paymentStatus: "paid", transactionId: session.id } },
       );
       res.send({ success: true, session });
     } else {
-      res.status(400).send({ success: false, message: "Payment not completed" });
+      res
+        .status(400)
+        .send({ success: false, message: "Payment not completed" });
     }
   } catch (error) {
     res.status(500).send({ success: false, error: error.message });
