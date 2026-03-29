@@ -7,6 +7,8 @@ const {
   applicationRejectedTemplate,
   applicationRevisionTemplate,
 } = require("../utils/emailTemplates");
+const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const r2 = require("../config/r2");
 
 const createApplication = async (req, res) => {
   try {
@@ -133,7 +135,7 @@ const updateApplication = async (req, res) => {
   try {
     const id = req.params.id;
     const email = req.decoded_email;
-    const { phone, dateOfBirth, gender, currentUniversity, cgpa } = req.body;
+    const { phone, dateOfBirth, gender, currentUniversity, cgpa, documentUrls } = req.body;
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).send({ message: "Invalid application ID" });
     }
@@ -147,7 +149,36 @@ const updateApplication = async (req, res) => {
     if (application.applicationStatus !== "pending" && application.applicationStatus !== "needs revision") {
       return res.status(400).send({ message: "Cannot edit application that is not pending or needs revision" });
     }
+
+    // Delete removed files from R2
+    if (documentUrls !== undefined) {
+      const existing = application.documentUrls ?? [];
+      const removed = existing.filter((u) => !documentUrls.includes(u));
+      if (removed.length > 0) {
+        const bucket = process.env.CLOUDFLARE_R2_BUCKET_NAME;
+        const base = process.env.CLOUDFLARE_R2_PUBLIC_URL;
+        if (!bucket || !base) {
+          console.error("R2 env vars not configured, skipping file deletion");
+        } else {
+          try {
+            await Promise.all(
+              removed.map((url) => {
+                const key = url.slice((base + "/").length);
+                return r2.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+              })
+            );
+          } catch (err) {
+            console.error("R2 deletion error:", err);
+            // non-fatal — proceed with DB update regardless
+          }
+        }
+      }
+    }
+
     const updateData = { phone, dateOfBirth, gender, currentUniversity, cgpa };
+    if (documentUrls !== undefined) {
+      updateData.documentUrls = documentUrls;
+    }
     if (application.applicationStatus === "needs revision") {
       updateData.applicationStatus = "pending";
     }
